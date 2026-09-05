@@ -2,6 +2,9 @@
 
 [中文](#中文) | [英文](#english)
 
+> 这是 **Yofk 的定制 fork**：在原仓库（kenzok8/imagebuilder）基础上修改了
+> 首次启动网络配置、SSH、root 密码，并加入 SmartDNS。
+
 ## 中文
 
 构建一个 ImmortalWrt x86/64 测试固件，默认包含
@@ -24,13 +27,17 @@
 工作流默认从
 [`kenzok8/openwrt-daede`](https://github.com/kenzok8/openwrt-daede) 的
 GitHub Release 下载匹配架构的 `luci-app-daede-*-x86_64.apk`，放入
-ImageBuilder 本地包源，然后安装以下软件包：
+ImageBuilder 本地包源。`smartdns` / `luci-app-smartdns` 来自 ImmortalWrt
+官方 feed。最终安装以下软件包：
 
 ```text
 luci
 luci-i18n-base-zh-cn
 luci-i18n-package-manager-zh-cn
 luci-app-daede
+luci-app-smartdns
+smartdns
+luci-i18n-smartdns-zh-cn
 kmod-sched-core
 kmod-sched-bpf
 kmod-veth
@@ -59,18 +66,19 @@ ImmortalWrt feed。如果对应 feed 缺少某个依赖，构建会失败。
 - 如果要面向缺少内置 BTF 的旧版 OpenWrt，请先通过完整 SDK 构建
   `vmlinux-btf`。
 
-### 首次启动默认值
+### 首次启动默认值（本 fork 定制）
 
 生成的固件首次启动时会应用以下默认配置：
 
-- LAN IP：`192.168.3.252/24`
-- Gateway：`192.168.3.254`
-- DNS：`192.168.3.254`、`223.5.5.5`
-- SSH 端口：`9167`
+- LAN IP：`10.0.0.1/24`（`br-lan`，eth0）
+- WAN：`eth1`，静态 `192.168.1.100/24`，网关 `192.168.1.1`（WAN6 走 DHCPv6）
+- DNS：未在 network 中显式指定，由 dnsmasq 按默认处理
+- 网络配置整体烘焙自 `/etc/config/network`，与源设备逐字节一致
+- SSH 端口：`22`
+- root 密码：`password2r`（首次开机即生效）
 
-仓库和生成的固件不会写入 root 密码。固件保留 OpenWrt 默认的空 root
-密码，首次通过 LuCI 或控制台登录后请设置新密码。如需无人值守登录，请通过
-私有 workflow 或 secret 注入 SSH 公钥。
+> 注：以上与原仓库默认值（LAN `192.168.3.252`、SSH `9167`、无 root 密码）
+> 不同，是此 fork 的定制配置。
 
 ### 构建
 
@@ -91,7 +99,7 @@ workflow 会把生成的固件作为 artifact 上传。当 `publish_release` 设
 - `daede_apk_url`：直接指定 APK 下载地址；填写后优先使用这个地址
 
 默认情况下不需要修改这些输入项，直接运行 workflow 即可生成内置
-`luci-app-daede` 的 x86/64 固件。
+`luci-app-daede` 和 SmartDNS 的 x86/64 固件。
 
 也可通过环境变量覆盖 daede APK 来源：
 
@@ -101,6 +109,10 @@ workflow 会把生成的固件作为 artifact 上传。当 `publish_release` 设
 - `INSTALL_DAEDE`：设为 `0` 可跳过内置 daede
 
 ## English
+
+> This is **Yofk's customized fork**: first-boot network config, SSH, root
+> password changed, and SmartDNS added on top of the upstream repo
+> (kenzok8/imagebuilder).
 
 Build an ImmortalWrt x86/64 KVM test image with
 [`luci-app-daede`](https://github.com/kenzok8/openwrt-daede) installed by
@@ -121,14 +133,18 @@ default, plus the runtime dependencies needed by `dae` / `daed`.
 
 The workflow downloads the matching `luci-app-daede-*-x86_64.apk` from the
 [`kenzok8/openwrt-daede`](https://github.com/kenzok8/openwrt-daede) GitHub
-Release, places it in ImageBuilder's local package directory, and installs these
-packages:
+Release, places it in ImageBuilder's local package directory.
+`smartdns` / `luci-app-smartdns` come from the official ImmortalWrt feed. The
+final package list:
 
 ```text
 luci
 luci-i18n-base-zh-cn
 luci-i18n-package-manager-zh-cn
 luci-app-daede
+luci-app-smartdns
+smartdns
+luci-i18n-smartdns-zh-cn
 kmod-sched-core
 kmod-sched-bpf
 kmod-veth
@@ -160,19 +176,19 @@ About BTF:
 - If you target an older OpenWrt release whose kernel lacks built-in BTF, build
   `vmlinux-btf` with a full SDK build first.
 
-### First Boot Defaults
+### First Boot Defaults (customized in this fork)
 
 The generated image applies these defaults on first boot:
 
-- LAN IP: `192.168.3.252/24`
-- Gateway: `192.168.3.254`
-- DNS: `192.168.3.254`, `223.5.5.5`
-- SSH port: `9167`
+- LAN IP: `10.0.0.1/24` (`br-lan`, eth0)
+- WAN: `eth1`, static `192.168.1.100/24`, gateway `192.168.1.1` (WAN6 via DHCPv6)
+- DNS: not pinned in network config, handled by dnsmasq defaults
+- The whole network config is baked in from `/etc/config/network`, byte-for-byte identical to the source device
+- SSH port: `22`
+- root password: `password2r` (applied on first boot)
 
-No root password is written into this repository or the generated image. The
-image keeps the OpenWrt default empty root password, so the first LuCI/console
-login should set a new password. For unattended access, inject an SSH public key
-using a private workflow/secret-based step.
+> Note: these differ from the upstream defaults (LAN `192.168.3.252`,
+> SSH `9167`, no root password) — this is the customization of this fork.
 
 ### Build
 
@@ -195,7 +211,7 @@ Common inputs:
 - `daede_apk_url`: direct APK download URL; when set, it takes priority
 
 For the normal x86/64 build, leave the inputs unchanged and run the workflow.
-The generated image will include `luci-app-daede`.
+The generated image will include `luci-app-daede` and SmartDNS.
 
 You can override the daede APK source with environment variables:
 

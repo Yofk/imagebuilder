@@ -1,0 +1,43 @@
+config interface 'loopback'
+	option device 'lo'
+	option proto 'static'
+	option ipaddr '127.0.0.1'
+	option netmask '255.0.0.0'
+
+config globals 'globals'
+	option packet_steering '1'
+	option steering_flows '128'
+	option dhcp_default_duid '0004cb43628689f9480491cbba07698cc62c'
+
+config device
+	option name 'br-lan'
+	option type 'bridge'
+	list ports 'eth0'
+
+config interface 'lan'
+	option device 'br-lan'
+	option proto 'static'
+	option ipaddr '10.0.0.1'
+	option netmask '255.255.255.0'
+
+config interface 'wan'
+	option device 'eth1'
+	option proto 'static'
+	option ipaddr '192.168.1.100'
+	option netmask '255.255.255.0'
+	option gateway '192.168.1.1'
+	option multipath 'off'
+
+config interface 'wan6'
+	option device 'eth1'
+	option proto 'dhcpv6'
+	option reqaddress 'try'
+	option reqprefix 'auto'
+	option norelease '1'
+	option extendprefix '1'
+	option multipath 'off'
+	option peerdns '0'
+
+config device
+	option name 'eth0'
+	option mtu '1500'
