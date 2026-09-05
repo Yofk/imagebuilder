@@ -17,6 +17,7 @@
 - 目标：`x86/64`
 - Profile：`generic`
 - Rootfs 分区：`1024` MB
+- 产物格式：`img.gz` / `qcow2` / `vmdk` / `vhdx`（EFI，squashfs）
 - ImageBuilder URL：
   `https://downloads.immortalwrt.org/releases/25.12-SNAPSHOT/targets/x86/64/immortalwrt-imagebuilder-25.12-SNAPSHOT-x86-64.Linux-x86_64.tar.zst`
 - 快捷链接：
@@ -38,6 +39,14 @@ luci-app-daede
 luci-app-smartdns
 smartdns
 luci-i18n-smartdns-zh-cn
+nikki
+luci-app-nikki
+luci-i18n-nikki-zh-cn
+mihomo-meta
+sqm-scripts
+luci-app-sqm
+luci-i18n-sqm-zh-cn
+openssh-sftp-server
 kmod-sched-core
 kmod-sched-bpf
 kmod-veth
@@ -45,6 +54,11 @@ kmod-xdp-sockets-diag
 curl
 nano
 ```
+
+`nikki` / `luci-app-nikki` / `mihomo-meta` 来自 Nikki 官方软件源
+（`https://nikkinikki.pages.dev/openwrt-25.12/x86_64/nikki`），源与公钥已烘焙进
+固件（`/etc/apk/repositories.d/customfeeds.list` + `/etc/apk/keys/nikki.pem`），
+刷机后可在 LuCI 软件包页直接升级。
 
 ImageBuilder 不会从源码编译 LuCI 应用；这里是把已经编译好的
 `luci-app-daede` APK 打进固件。`dae` / `daed` 和内核依赖仍来自所选
@@ -145,6 +159,14 @@ luci-app-daede
 luci-app-smartdns
 smartdns
 luci-i18n-smartdns-zh-cn
+nikki
+luci-app-nikki
+luci-i18n-nikki-zh-cn
+mihomo-meta
+sqm-scripts
+luci-app-sqm
+luci-i18n-sqm-zh-cn
+openssh-sftp-server
 kmod-sched-core
 kmod-sched-bpf
 kmod-veth
@@ -152,6 +174,12 @@ kmod-xdp-sockets-diag
 curl
 nano
 ```
+
+`nikki` / `luci-app-nikki` / `mihomo-meta` come from the official Nikki feed
+(`https://nikkinikki.pages.dev/openwrt-25.12/x86_64/nikki`). The feed URL and
+public key are baked into the image
+(`/etc/apk/repositories.d/customfeeds.list` + `/etc/apk/keys/nikki.pem`), so
+they can be upgraded from LuCI's package manager after flashing.
 
 ImageBuilder does not compile the LuCI app from source. This repository bakes the
 prebuilt `luci-app-daede` APK into the image. `dae` / `daed` and kernel

@@ -14,8 +14,11 @@ DAEDE_REPO="${DAEDE_REPO:-kenzok8/openwrt-daede}"
 DAEDE_RELEASE_TAG="${DAEDE_RELEASE_TAG:-latest}"
 DAEDE_ARCH="${DAEDE_ARCH:-x86_64}"
 DAEDE_APK_URL="${DAEDE_APK_URL:-}"
+INSTALL_NIKKI="${INSTALL_NIKKI:-1}"
+NIKKI_FEED_URL="${NIKKI_FEED_URL:-https://nikkinikki.pages.dev/openwrt-25.12/x86_64/nikki/packages.adb}"
+NIKKI_KEY_URL="${NIKKI_KEY_URL:-https://nikkinikki.pages.dev/public-key.pem}"
 
-EXTRA_PACKAGES="${EXTRA_PACKAGES:-luci luci-i18n-base-zh-cn luci-i18n-package-manager-zh-cn luci-app-daede kmod-sched-core kmod-sched-bpf kmod-veth kmod-xdp-sockets-diag smartdns luci-app-smartdns luci-i18n-smartdns-zh-cn curl nano}"
+EXTRA_PACKAGES="${EXTRA_PACKAGES:-luci luci-i18n-base-zh-cn luci-i18n-package-manager-zh-cn luci-app-daede kmod-sched-core kmod-sched-bpf kmod-veth kmod-xdp-sockets-diag smartdns luci-app-smartdns luci-i18n-smartdns-zh-cn nikki luci-app-nikki luci-i18n-nikki-zh-cn mihomo-meta sqm-scripts luci-app-sqm luci-i18n-sqm-zh-cn openssh-sftp-server curl nano}"
 
 WORK_DIR="${WORK_DIR:-$PWD/work}"
 IB_ARCHIVE="$WORK_DIR/imagebuilder.tar.zst"
@@ -98,6 +101,33 @@ install_daede_apk() {
     -o "$packages_dir/$fname" "$daede_url"
 }
 
+install_nikki_feed() {
+  case "$INSTALL_NIKKI" in
+    1|true|yes) ;;
+    *)
+      echo "Skipping Nikki feed setup."
+      return
+      ;;
+  esac
+
+  local ib_dir="$WORK_DIR/imagebuilder"
+
+  # 把 Nikki 软件源挂进 ImageBuilder 构建环境（apk 解析依赖用）
+  if ! grep -q 'nikkinikki.pages.dev' "$ib_dir/repositories" 2>/dev/null; then
+    echo "$NIKKI_FEED_URL" >> "$ib_dir/repositories"
+    echo "Added Nikki feed to ImageBuilder repositories: $NIKKI_FEED_URL"
+  fi
+
+  # 导入 Nikki 公钥到 ImageBuilder 的 APK key 目录（签名校验）
+  mkdir -p "$ib_dir/keys"
+  if [ -f "files/etc/apk/keys/nikki.pem" ]; then
+    cp -f "files/etc/apk/keys/nikki.pem" "$ib_dir/keys/nikki.pem"
+  else
+    curl -fsSL --retry 8 --connect-timeout 30 -o "$ib_dir/keys/nikki.pem" "$NIKKI_KEY_URL"
+  fi
+  echo "Nikki public key installed to ImageBuilder keys dir"
+}
+
 if [ ! -s "$IB_ARCHIVE" ]; then
   curl -L --retry 8 --retry-delay 5 --connect-timeout 30 \
     -o "$IB_ARCHIVE" "$IMAGEBUILDER_URL"
@@ -109,6 +139,7 @@ tar --use-compress-program=unzstd -xf "$IB_ARCHIVE" -C "$WORK_DIR/imagebuilder" 
 
 cp -a files "$WORK_DIR/imagebuilder/files"
 install_daede_apk
+install_nikki_feed
 
 cd "$WORK_DIR/imagebuilder"
 
@@ -162,12 +193,11 @@ if [ "$PREFLIGHT" = "1" ] || [ "$PREFLIGHT" = "true" ]; then
   fi
 fi
 
-# Slim image formats: keep only squashfs EFI img.gz + qcow2 + vmdk
+# Slim image formats: keep squashfs EFI img.gz + qcow2 + vmdk + vhdx
 sed -i \
   -e 's/^CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' \
   -e 's/^CONFIG_TARGET_ROOTFS_TARGZ=y/# CONFIG_TARGET_ROOTFS_TARGZ is not set/' \
   -e 's/^CONFIG_VDI_IMAGES=y/# CONFIG_VDI_IMAGES is not set/' \
-  -e 's/^CONFIG_VHDX_IMAGES=y/# CONFIG_VHDX_IMAGES is not set/' \
   -e 's/^CONFIG_ISO_IMAGES=y/# CONFIG_ISO_IMAGES is not set/' \
   -e 's/^CONFIG_GRUB_IMAGES=y/# CONFIG_GRUB_IMAGES is not set/' \
   .config
@@ -188,11 +218,12 @@ fi
 	for f in *-squashfs-combined-efi.img.gz;  do [ -f "$f" ] && mv "$f" daede-squashfs-efi.img.gz;  done
 	for f in *-squashfs-combined-efi.qcow2; do [ -f "$f" ] && mv "$f" daede-squashfs-efi.qcow2; done
 	for f in *-squashfs-combined-efi.vmdk;  do [ -f "$f" ] && mv "$f" daede-squashfs-efi.vmdk;  done
+	for f in *-squashfs-combined-efi.vhdx;  do [ -f "$f" ] && mv "$f" daede-squashfs-efi.vhdx;  done
 	for f in *-kernel.bin;                do [ -f "$f" ] && mv "$f" daede-kernel.bin;            done
 	for f in *-rootfs.tar.gz;             do [ -f "$f" ] && mv "$f" daede-rootfs.tar.gz;         done
 	for f in *.manifest;                  do [ -f "$f" ] && mv "$f" daede.manifest;              done
 	for f in *.bom.cdx.json;              do [ -f "$f" ] && mv "$f" daede.bom.cdx.json;          done
-	for f in *.img.gz *.qcow2 *.vmdk *.bin *.tar.gz *.manifest *.bom.cdx.json; do
+	for f in *.img.gz *.qcow2 *.vmdk *.vhdx *.bin *.tar.gz *.manifest *.bom.cdx.json; do
 	  [ -f "$f" ] || continue
 	  sha256sum "$f"
 	done > sha256sums
@@ -210,6 +241,7 @@ fi
 | **img.gz** | 物理机 dd 写盘 / PVE 导入 | daede-squashfs-efi.img.gz |
 | **qcow2** | QEMU / Proxmox VE | daede-squashfs-efi.qcow2 |
 | **vmdk** | VMware ESXi / Workstation | daede-squashfs-efi.vmdk |
+| **vhdx** | Windows Hyper-V (Gen2) | daede-squashfs-efi.vhdx |
 
 > 额外：`daede-rootfs.tar.gz` 裸文件系统，可用于 LXC 容器转换。
 
